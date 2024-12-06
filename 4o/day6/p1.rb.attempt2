@@ -1,0 +1,72 @@
+require 'set'
+
+# Read the input map from the file
+map = File.readlines("input.txt", chomp: true).map(&:chars)
+
+# Directions mapping (index represents direction: 0=up, 1=right, 2=down, 3=left)
+directions = [
+  [-1, 0], # Up
+  [0, 1],  # Right
+  [1, 0],  # Down
+  [0, -1]  # Left
+]
+
+# Locate the guard's initial position and direction
+guard_position = nil
+guard_direction = 0 # Default direction is up (0)
+
+map.each_with_index do |row, r|
+  row.each_with_index do |cell, c|
+    if %w[^ > v <].include?(cell)
+      guard_position = [r, c]
+      guard_direction = { "^" => 0, ">" => 1, "v" => 2, "<" => 3 }[cell]
+      map[r][c] = "." # Replace the guard's starting position with an empty space
+      break
+    end
+  end
+  break if guard_position
+end
+
+# Track visited positions
+visited = Set.new
+visited.add(guard_position)
+
+# Simulate the guard's movement
+rows = map.size
+cols = map.first.size
+
+# Track the number of consecutive turns without moving
+consecutive_turns = 0
+
+loop do
+  # Calculate the next position based on the current direction
+  next_position = [
+    guard_position[0] + directions[guard_direction][0],
+    guard_position[1] + directions[guard_direction][1]
+  ]
+
+  # Check if the next position is out of bounds or blocked
+  if next_position[0] < 0 || next_position[0] >= rows ||
+     next_position[1] < 0 || next_position[1] >= cols ||
+     map[next_position[0]][next_position[1]] == "#"
+    # Turn right 90 degrees
+    guard_direction = (guard_direction + 1) % 4
+    consecutive_turns += 1
+  else
+    # Move to the next position
+    guard_position = next_position
+    visited.add(guard_position)
+    consecutive_turns = 0
+  end
+
+  # Stop if the guard moves out of bounds
+  break if guard_position[0] < 0 || guard_position[0] >= rows ||
+           guard_position[1] < 0 || guard_position[1] >= cols
+
+  # Stop if the guard is stuck turning in place
+  break if consecutive_turns >= 4
+end
+
+# Output the number of distinct positions visited
+puts visited.size
+

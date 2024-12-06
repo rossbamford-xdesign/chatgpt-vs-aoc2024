@@ -1,0 +1,113 @@
+require 'set'
+
+map = File.readlines('input.txt', chomp: true).map(&:chars)
+
+rows = map.size
+cols = map.first.size
+
+# Directions and mapping
+DIRECTIONS = {
+  '^' => [-1, 0],
+  'v' => [1, 0],
+  '<' => [0, -1],
+  '>' => [0, 1]
+}
+
+ORDERED_DIRECTIONS = [
+  [-1, 0], # up
+  [0, 1],  # right
+  [1, 0],  # down
+  [0, -1]  # left
+]
+
+def direction_index(dir)
+  ORDERED_DIRECTIONS.index(dir)
+end
+
+def turn_right(dir)
+  i = ORDERED_DIRECTIONS.index(dir)
+  ORDERED_DIRECTIONS[(i + 1) % 4]
+end
+
+# Find guard initial position and direction
+guard_row = nil
+guard_col = nil
+guard_dir = nil
+
+map.each_with_index do |line, r|
+  line.each_with_index do |ch, c|
+    if DIRECTIONS.key?(ch)
+      guard_row, guard_col = r, c
+      guard_dir = DIRECTIONS[ch]
+      map[r][c] = '.' # Replace guard symbol with floor
+      break
+    end
+  end
+  break if guard_row
+end
+
+# We'll try placing a single new obstacle ('#') in each possible empty spot ('.')
+# except the guard's starting position. For each placement, we simulate and see if 
+# the guard gets stuck in a loop.
+#
+# To detect a loop, we track states of (row, col, dir_index). If we ever repeat 
+# the same state, it means the guard is looping.
+#
+# We count how many placements cause the guard to never leave the map.
+
+def simulate_with_obstacle(map, obstacle_r, obstacle_c, guard_start_r, guard_start_c, guard_start_dir)
+  # Make a copy of the map with the new obstacle
+  new_map = map.map(&:dup)
+  new_map[obstacle_r][obstacle_c] = '#'
+
+  current_row, current_col = guard_start_r, guard_start_c
+  dir = guard_start_dir
+  visited_states = Set.new
+
+  loop do
+    # Check if we are out of bounds -> guard leaves the map
+    if current_row < 0 || current_row >= new_map.size || current_col < 0 || current_col >= new_map[0].size
+      return false # guard left the map, no loop
+    end
+
+    state = [current_row, current_col, ORDERED_DIRECTIONS.index(dir)]
+    if visited_states.include?(state)
+      # We've seen this exact situation before -> loop
+      return true
+    end
+    visited_states.add(state)
+
+    # Check cell in front
+    next_r = current_row + dir[0]
+    next_c = current_col + dir[1]
+
+    # Check if next is out of bounds or obstacle
+    if next_r < 0 || next_r >= new_map.size || next_c < 0 || next_c >= new_map[0].size || new_map[next_r][next_c] == '#'
+      # Turn right
+      dir = turn_right(dir)
+    else
+      # Move forward
+      current_row = next_r
+      current_col = next_c
+    end
+  end
+end
+
+count = 0
+(0...rows).each do |r|
+  (0...cols).each do |c|
+    # Potential obstacle placement
+    # Conditions:
+    # 1. Must currently be '.' to place obstacle
+    # 2. Cannot be the guard's starting position
+    next unless map[r][c] == '.'
+    next if r == guard_row && c == guard_col
+
+    if simulate_with_obstacle(map, r, c, guard_row, guard_col, guard_dir)
+      count += 1
+    end
+  end
+end
+
+puts count
+
